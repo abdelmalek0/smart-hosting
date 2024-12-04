@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "smart-hosting"
+version = "0.1.0"
+description = "A smart and efficient image hosting solution built with Python. Smart Hosting simplifies photo and image upload, management, and sharing with an intuitive and scalable structure. Ideal for businesses and individuals seeking seamless image hosting capabilities."
+authors = ["abdelmalek0 <djamaa.abdelmalek98@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.115.6"
+httpx = "^0.28.0"
+uvicorn = "^0.32.1"
+werkzeug = "^3.1.3"
+python-multipart = "^0.0.19"
+reorder-python-imports = "^3.14.0"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
