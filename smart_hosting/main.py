@@ -10,6 +10,7 @@ from fastapi.logger import logger as fastapi_logger
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from PIL import Image
 from pydantic import BaseModel
 from werkzeug.utils import secure_filename
 
@@ -40,6 +41,15 @@ def allowed_file(filename):
     return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def compress_image(image_path: str) -> None:
+    # Open the image file
+    with Image.open(image_path) as img:
+        # Resize image to 640x640 without changing quality
+        img_resized = img.resize((640, 640), Image.LANCZOS)
+        # Save the resized image
+        img_resized.save(image_path, "JPEG", quality=100, optimize=True)
+
+
 # Define request model for URL upload
 class URLUpload(BaseModel):
     url: str
@@ -58,6 +68,9 @@ async def upload_from_url(data: URLUpload):
                 with open(filepath, "wb") as f:
                     async for chunk in response.aiter_bytes(1024):
                         f.write(chunk)
+
+                # Compress the image if necessary
+                compress_image(filepath)
 
                 return {"message": "File uploaded successfully", "filename": filename}
             else:
@@ -78,6 +91,9 @@ async def upload_file(file: UploadFile = File(...)):
 
     with open(filepath, "wb") as f:
         f.write(await file.read())
+
+    # Compress the image if necessary
+    compress_image(filepath)
 
     return {"message": "File uploaded successfully", "filename": filename}
 
