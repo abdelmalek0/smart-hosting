@@ -1,9 +1,12 @@
 import logging
 import os
+from io import BytesIO
+from typing import Optional
 
 import httpx
 from fastapi import FastAPI
 from fastapi import File
+from fastapi import Form
 from fastapi import HTTPException
 from fastapi import UploadFile
 from fastapi.logger import logger as fastapi_logger
@@ -30,10 +33,17 @@ app.add_middleware(
 # Define the upload folder and allowed file extensions
 UPLOAD_FOLDER = os.path.join(os.getcwd(), "uploads/")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "pdf"}
+ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "pdf", "mp3", "wav", "ogg", "m4a", "aac"}
 
+def is_image_file(filename: str) -> bool:
+    """Check if the file is an image based on its extension."""
+    return "." in filename and filename.rsplit(".", 1)[1].lower() in {"png", "jpg", "jpeg", "gif"}
 # Mount the upload folder for serving static files
 app.mount("/files", StaticFiles(directory=UPLOAD_FOLDER), name="files")
+
+class URLUpload(BaseModel):
+    url: str
+    compress: Optional[bool] = True
 
 
 # Function to check allowed file extensions
@@ -50,14 +60,11 @@ def compress_image(image_path: str) -> None:
         img_resized.save(image_path, "JPEG", quality=100, optimize=True)
 
 
-# Define request model for URL upload
-class URLUpload(BaseModel):
-    url: str
-
-
 @app.post("/api/files/index")
 async def upload_from_url(data: URLUpload):
     url = data.url
+    compress = data.compress
+
     try:
         async with httpx.AsyncClient(verify=False) as client:
             response = await client.get(url)
@@ -65,12 +72,24 @@ async def upload_from_url(data: URLUpload):
                 filename = secure_filename(f"{url.split('=')[-1]}.jpg")
                 filepath = os.path.join(UPLOAD_FOLDER, filename)
 
-                with open(filepath, "wb") as f:
-                    async for chunk in response.aiter_bytes(1024):
-                        f.write(chunk)
+                
+                image_bytes = await response.aread()
+                image = Image.open(BytesIO(image_bytes))
+
+                # Convert RGBA to RGB if needed
+                if image.mode in ("RGBA", "LA"):
+                    background = Image.new("RGB", image.size, (255, 255, 255))
+                    background.paste(image, mask=image.split()[-1])  # use alpha mask
+                    image = background
+                else:
+                    image = image.convert("RGB")
+
+                # Save as JPEG
+                image.save(filepath, "JPEG")
 
                 # Compress the image if necessary
-                compress_image(filepath)
+                if compress:
+                    compress_image(filepath)
 
                 return {"message": "File uploaded successfully", "filename": filename}
             else:
@@ -93,7 +112,8 @@ async def upload_file(file: UploadFile = File(...)):
         f.write(await file.read())
 
     # Compress the image if necessary
-    compress_image(filepath)
+    if is_image_file(filename):
+        compress_image(filepath)
 
     return {"message": "File uploaded successfully", "filename": filename}
 
