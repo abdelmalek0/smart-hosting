@@ -6,8 +6,8 @@ from typing import Optional
 import httpx
 from fastapi import FastAPI
 from fastapi import File
-from fastapi import Form
 from fastapi import HTTPException
+from fastapi import Query
 from fastapi import UploadFile
 from fastapi.logger import logger as fastapi_logger
 from fastapi.middleware.cors import CORSMiddleware
@@ -101,7 +101,7 @@ async def upload_from_url(data: URLUpload):
 
 
 @app.post("/api/files/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(file: UploadFile = File(...), compress=Query(False)):
     if not allowed_file(file.filename):
         raise HTTPException(status_code=400, detail="Invalid file type")
 
@@ -112,7 +112,7 @@ async def upload_file(file: UploadFile = File(...)):
         f.write(await file.read())
 
     # Compress the image if necessary
-    if is_image_file(filename):
+    if compress and is_image_file(filename):
         compress_image(filepath)
 
     return {"message": "File uploaded successfully", "filename": filename}
